@@ -1,0 +1,222 @@
+# UserController.js
+
+## userStockDraftAdd():
+
+```js
+for (let i = 0; i < comparedStockList.length; i++) {
+      let constK =
+        parseFloat(2 * comparedStockList[i].drf_stock_current_price) /
+        parseFloat(comparedStockList[i].drf_stock_current_price);
+
+      let createProcessLad = {
+        clp_user_id: comparedStockList[i].drf_user_reg_id,
+        clp_stock_id: comparedStockList[i].drf_user_stocks,
+        clp_target_price: parseFloat(
+          2 * comparedStockList[i].drf_stock_current_price
+        ),
+
+        clp_initial_purchase_price: parseFloat(
+          comparedStockList[i].drf_stock_current_price
+        ),
+
+        clp_cash_allocated: parseFloat(
+          (await getUserCashAvailableForNewLadder(userRegId)) / numOfStocks
+        ).toFixed(2),
+      };
+```
+
+Description: The above calculation is carried on in a loop for the stocks user has in the dd_user_stock_draft table in the database
+
+```js
+createProcessLad.clp_initial_buy_quantity = (
+        (parseFloat(createProcessLad.clp_cash_allocated) /
+          parseFloat(createProcessLad.clp_initial_purchase_price)) *
+        ((2 * constK - 2) / (2 * constK - 1))
+      ).toFixed(2);
+      createProcessLad.clp_default_buy_sell_quantity = (
+        parseFloat(createProcessLad.clp_initial_buy_quantity) / 10
+      ).toFixed(2);
+      let numberOfStepsAboveFirstPurchase =
+        createProcessLad.clp_initial_buy_quantity /
+        createProcessLad.clp_default_buy_sell_quantity;
+      createProcessLad.clp_step_size = (
+        (createProcessLad.clp_target_price -
+          createProcessLad.clp_initial_purchase_price) /
+        numberOfStepsAboveFirstPurchase
+      ).toFixed(2);
+      proccesLadList.push(createProcessLad);
+    }
+```
+
+These are the further calculation performed for finding ladder parameters
+
+## getAmountAllocationStock():
+
+```js
+const allocatedAmount = parseFloat(totalInvestedAmount / numberOfStock);
+```
+
+**Description:** calculating allocatedAmount of a user using the above formula.
+Here, numberOfStocks is obtained by dd_user_stock_draft table in the database. (all the stocks of user in these table is obtained)
+Whereas the totalInvestedAmount is calculated and obtained from a function named getUserCashAvailableForNewLadder() from userAccountReusableFunction.js
+
+```js
+return (
+  parseFloat(getUserTotalAmount.usr_accunt_cash_available) -
+  parseFloat(totalCashNeeded)
+);
+```
+
+The above code is from getUserCashAvailableForNewLadder function
+Here the user_accunt_cash_available is obtained from user_accnt_detail table in the database
+
+```js
+if (parseInt(result[0].sumOfCashNeeded) != 0) {
+  totalCashNeeded = result[0].sumOfCashNeeded;
+}
+
+if (parseInt(result[0].sumOfCashNeededInitalActiveLadders) != 0) {
+  totalCashNeeded = result[0].sumOfCashNeededInitalActiveLadders;
+}
+```
+
+The above code tells how totalCashNeed is obtained.
+Here Result is obtained from user_ladder table in the database
+
+## reviewPurchaseStock():
+
+### cashAllocationForNullLadder
+
+```js
+const cashAllocationForNullLadders =
+  cashForNewLadder / allocatedStockData.length;
+```
+
+The following code finds the cashAllocatedforNullLadder
+here the cashForNewLadder is obtained from getUserCashAvailableForNewLadder which is similar to the above function i.e: getAmountAllocationStock
+
+```js
+const allocatedStockData = await sequelizeInstance.query(
+  'SELECT dd_bse_symbol_list.sym_issuer_name, dd_bse_symbol_list.sym_security_id, dd_bse_symbol_list.sym_group, dd_bse_symbol_list.sym_exchange, dd_bse_symbol_list.sym_security_name , CONCAT(dd_bse_symbol_list.sym_exchange,":",dd_bse_symbol_list.sym_security_id,"-",dd_bse_symbol_list.sym_group) AS sym_symbol, dd_bse_symbol_list.sym_sector_name, dd_bse_symbol_list.sym_id, dd_user_stock_draft.drf_allocated_amount AS allocated_amount, dd_user_stock_draft.drf_stock_current_price as stockCurrentPrice  FROM dd_bse_symbol_list INNER JOIN dd_user_stock_draft ON dd_user_stock_draft.drf_user_stocks = dd_bse_symbol_list.sym_id WHERE dd_user_stock_draft.drf_user_reg_id = :regId AND dd_user_stock_draft.drf_allocated_amount >0',
+
+  {
+    replacements: { regId: userRegId },
+
+    type: QueryTypes.SELECT,
+  }
+);
+```
+
+Where as allocatedStockData is being calculated from the above query.
+
+### LadderData
+
+```js
+ladderData = {
+  lad_id: null,
+  user_id: parseInt(userRegId),
+  lad_ladder_name: null,
+  lad_stock_name: allocatedStockData[i].sym_security_id,
+  lad_initial_buy_quantity: null,
+  lad_minimum_price: null,
+  lad_status: null,
+  lad_initial_purchase_price: null,
+  lad_target_price: (
+    2 *
+    (await getMarketPriceByStockName(
+      allocatedStockData[i].sym_security_id,
+      parseInt(userRegId)
+    ))
+  ).toFixed(2),
+  lad_default_buy_sell_quantity: null,
+  lad_market_order: true,
+  lad_cash_needed: null,
+  lad_max_purchase_cash_gain: null,
+  lad_available_cash: parseFloat(
+    allocatedStockData[i].allocated_amount
+  ).toFixed(2),
+  lad_cash_initial_allocated: parseFloat(
+    allocatedStockData[i].allocated_amount
+  ).toFixed(2),
+  lad_stocks_bought_after_inital_purchase: null,
+  lad_cash_gain_for_new_stock: null,
+  lad_cash_gain_for_all_stock: null,
+  lad_cash_gain_for_initial_purchase: null,
+  lad_step_size: null,
+  lad_reinvest_profit: null,
+  lad_trading_status: null,
+  lad_created_at: null,
+  ladderExist: false,
+  is_new_ladder: true,
+  current_price: await getMarketPriceByStockName(
+    allocatedStockData[i].sym_security_id,
+    parseInt(userRegId)
+  ),
+};
+```
+
+In the above code target price is calculated by obtaining market price from a function i.e. getMarketPriceByStockName()
+These function does not perform any calculation rather it take values from table
+
+```js
+let currentPrice = await dd_user_stock_draft.findOne({
+  where: {
+    drf_user_stocks: stockid.sym_id,
+    drf_user_reg_id: parseInt(userId),
+  },
+
+  raw: true,
+});
+```
+
+it takes values from dd_user_stock_draft table in the database.
+
+then the below values is returned by these function
+
+```js
+return currentPrice.drf_stock_current_price;
+```
+
+## createNullLadders():
+
+```js
+async function createNullLadders(userRegId, stockName, allocatedAmount) {
+  ladderData = {
+    lad_id: null,
+    user_id: parseInt(userRegId),
+    lad_ladder_name: null,
+    lad_stock_name: stockName,
+    lad_initial_buy_quantity: null,
+    lad_minimum_price: null,
+    lad_status: null,
+    lad_initial_purchase_price: null,
+    lad_target_price: (
+      2 * (await getMarketPriceByStockName(stockName, parseInt(userRegId)))
+    ).toFixed(2),
+    lad_default_buy_sell_quantity: null,
+    lad_market_order: true,
+    lad_cash_needed: null,
+    lad_max_purchase_cash_gain: null,
+    lad_available_cash: parseFloat(allocatedAmount).toFixed(2),
+    lad_cash_initial_allocated: parseFloat(allocatedAmount).toFixed(2),
+    lad_stocks_bought_after_inital_purchase: null,
+    lad_cash_gain_for_new_stock: null,
+    lad_cash_gain_for_all_stock: null,
+    lad_cash_gain_for_initial_purchase: null,
+    lad_step_size: null,
+    lad_reinvest_profit: null,
+    lad_trading_status: null,
+    lad_created_at: null,
+    ladderExist: false,
+    is_new_ladder: true,
+    current_price: await getMarketPriceByStockName(
+      stockName,
+      parseInt(userRegId)
+    ),
+  };
+  console.log("Null ladder created");
+  return ladderData;
+}
+```
+
+These function also calculated the targetPrice as in the reviewPurchaseStock.

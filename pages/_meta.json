@@ -1,0 +1,11 @@
+{
+  "index": "Introduction",
+  "another": "Codebase",
+  "advanced": "API Docs",
+  "contact": {
+    "title": "Dozen Diamonds application",
+    "type": "page",
+    "href": "https://app.dozendiamonds.com",
+    "newWindow": true
+  }
+}
