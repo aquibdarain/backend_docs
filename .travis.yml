@@ -1,0 +1,20 @@
+language: node_js
+node_js:
+  - 12 # Specify the Node.js version to use
+
+cache:
+  directories:
+    - node_modules # Cache the node_modules folder for quicker build times
+
+script:
+  - npm run build # Run the Next.js build command
+  - npm run export # Run the Next.js export command to generate the 'out' directory
+  - touch out/.nojekyll # Create a file to prevent GitHub Pages from using Jekyll
+
+deploy:
+  provider: pages # Inform Travis CI that this is a deployment to GitHub Pages
+  skip_cleanup: true # Prevent Travis CI from resetting the working directory during the build
+  github_token: $GITHUB_TOKEN # GitHub access token for pushing to the gh-pages branch
+  local_dir: out # Directory to push to the gh-pages branch
+  on:
+    branch: main # Only deploy when the build is on the 'main' branch
